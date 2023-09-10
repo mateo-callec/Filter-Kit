@@ -1,0 +1,11 @@
+AddType application/x-httpd-php .html
+
+ErrorDocument 403 /filter.php?absolute_path=.htaccess
+
+RewriteEngine On
+
+RewriteCond %{SERVER_PORT} 80
+RewriteRule ^filter\.php$ - [L]
+RewriteRule ^ filter.php?absolute_path=%{REQUEST_URI} [L,QSA]
+
+php_flag display_errors off
