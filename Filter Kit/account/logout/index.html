@@ -1,0 +1,21 @@
+<?php
+
+if (isset($_SESSION["auth"]) || isset($_SESSION["confirm"]["email"]))
+{
+	if (isset($_SESSION["auth"]))
+	{
+		unset($_SESSION["auth"]);
+	} else if (isset($_SESSION["confirm"]["email"]))
+	{
+		unset($_SESSION["confirm"]["email"]);
+	}
+
+	// Alert session
+	$_SESSION["alert"] = ["title" => $lang->{"alert.content.logout.title"}, "content" => $lang->{"alert.content.logout.content"}];
+
+	redirect($inter_website_path);
+} else {
+	error(404);
+}
+
+?>

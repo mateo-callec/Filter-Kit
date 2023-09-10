@@ -1,0 +1,20 @@
+[
+	["/", "/index.html"],
+	["/account/logout/", "/account/logout/index.html"],
+	["/admin", "/easter_eggs/admin.html"],
+	["/admin/", "/easter_eggs/admin.html"],
+	["/css/", "/assets/css/"],
+	["/fonts/", "/assets/fonts/"],
+	["/img/", "/assets/img/"],
+	["/js/", "/assets/js/"],
+	["/legal/privacy/", "/legal/privacy.html"],
+	["/legal/returns/", "/legal/returns.html"],
+	["/legal/terms/", "/legal/terms.html"],
+	["/login/", "/account/login/index.html"],
+	["/POST/close_announcement/", "/POST/close_announcement.html"],
+	["/register/confirm/", "/account/register/confirm.html"],
+	["/register/", "/account/register/index.html"],
+	["/robots.txt", "/assets/txt/robots.txt"],
+	["/search/", "/search/index.html"],
+	["/xml/", "/assets/xml/"]
+]

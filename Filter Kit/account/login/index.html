@@ -1,0 +1,128 @@
+<?php
+
+if (isset($_SESSION["auth"]))
+{
+	redirect("../");
+} else if (isset($_SESSION["confirm"]["email"])) {
+	redirect("../register/confirm/?type=email");
+}
+
+$incorrect_login = $lang->{"error.incorrect_login"};
+
+if (isset($_POST["user"]) && isset($_POST["password"]))
+{
+	// Check if the user exists
+
+	$req = $db["accounts"]->prepare("SELECT * FROM users WHERE email = ?");
+	$req->execute([$_POST["user"]]);
+	$infos = $req->fetch();
+
+	if ($infos)
+	{
+		// User exists
+		
+		// Check if the password is correct
+		if (password_verify($_POST["password"], $infos->password))
+		{
+			// Check if the user has verified his email
+
+			if ($infos->verified_email == 0)
+			{
+				$_SESSION["confirm"]["email"] = htmlentities($_POST["user"]);
+
+				redirect("../register/confirm/?type=email");
+			} else {
+				$req = $db["shield"]->prepare("INSERT INTO accounts SET user_id = ?, ip = ?, location = ?, datetime = NOW(), cookie_id = ?");
+				$req->execute([$infos->id, openssl_encrypt($ip, $cipher_algo, $encrypt_password), openssl_encrypt(file_get_contents("http://www.geoplugin.net/php.gp?ip=" . $ip), $cipher_algo, $encrypt_password), $session_cookie->id]);
+				
+				$_SESSION["auth"] = $infos;
+
+				// Check if the user needs to be redirected
+				if (isset($_GET["redirect"]))
+				{
+					redirect($inter_website_path . $_GET["redirect"]);
+				} else {
+					redirect("../");
+				}
+			}
+		} else {
+			// Incorrect password
+
+			$_SESSION["flash"]["error"] = $incorrect_login;
+		}
+	} else {
+		// User don't exists
+
+		$_SESSION["flash"]["error"] = $incorrect_login;
+	}
+}
+
+?><!DOCTYPE html>
+<html lang="<?= $html_lang; ?>" data-theme="light">
+	<head>
+		<title>Connexion - <?= strtoupper($lang->{"name"}); ?></title>
+
+		<?php
+			print(page_information("Connexion - " . strtoupper($lang->{"name"}), "Afin d'accéder à d'autres fonctionnalités du site, connectez vous à votre compte client.", "connexion, compte client"));
+		?>
+
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/fonts.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/form.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/utils.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/style.css" />
+	</head>
+	<body class="no-select">
+		<?php
+			include_once("assets/html/loading.html");
+		?>
+
+		<?php
+			include_once("assets/html/announcement.html");
+		?>
+
+		<?php
+			include_once("assets/html/header.html");
+		?>
+
+
+		<form class="form" id="form" method="POST" action="">
+			<?php
+				require_once("assets/php/display_errors.php");
+			?>
+
+			<?php
+				if (isset($_GET["redirect"]))
+				{
+					?><span class="warning"><?= $lang->{"notification.warning.need_to_be_logged_in"}; ?></span><?php
+				}
+			?>
+			
+			<h1 class="title"><?= $lang->{"form.login.title"}; ?></h1>
+
+			<span class="input-info"><?= $lang->{"form.login.content.user"}; ?></span>
+			<input class="input full-input" type="email" name="user" placeholder="<?= $lang->{"form.login.content.user.user"}; ?> *" style="border-radius: 10px;" required />
+
+			<br />
+
+			<span class="input-info"><?= $lang->{"form.login.content.password"}; ?></span>
+			<input class="input full-input" type="password" name="password" placeholder="<?= $lang->{"form.login.content.password.password"}; ?> *" style="border-radius: 10px;" required />
+
+			<br />
+
+			<button class="form-button" type="submit"><?= $lang->{"form.login.button.submit"}; ?></button>
+			<button class="form-button" onclick="window.location = '<?= $inter_website_path; ?>/register/';"><?= $lang->{"form.login.button.register"}; ?></button>
+
+			<footer class="legal">
+				<span class="legal-credits"><?= $lang->{"footer.form.credits"}; ?></span>
+				<br />
+				<span class="legal"><?= $lang->{"footer.form.legal"}; ?></span>
+			</footer>
+		</form>
+
+		<?php
+			include_once("assets/html/footer.html");
+		?>
+
+		<script type="text/javascript" src="<?= $website_path; ?>/js/utils.js"></script>
+	</body>
+</html>

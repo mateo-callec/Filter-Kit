@@ -1,0 +1,128 @@
+<?php
+
+if (!isset($_SESSION["confirm"]) || !isset($_GET["type"]) || $_GET["type"] != "email")
+{
+	error(403);
+} else {
+	$confirm_type = $_GET["type"];
+}
+
+if ($confirm_type == "email" && isset($_SESSION["confirm"]["email"]))
+{
+	if (isset($_POST["code"]) && !empty($_POST["code"]))
+	{
+		if (intval($_POST["code"]))
+		{
+			$code = intval($_POST["code"]);
+			// Check if the session contains a real email
+			
+			$req = $db["accounts"]->prepare("SELECT * FROM users WHERE email = ?");
+			$req->execute([$_SESSION["confirm"]["email"]]);
+			$infos = $req->fetch();
+
+			if ($infos)
+			{
+				// Check if the user has already verified his email
+
+				if ($infos->verified_email == 0)
+				{
+					// Check if the validation token is correct
+
+					if ($code === $infos->confirm_email_token)
+					{
+						// The correct token has been used
+
+						$req = $db["accounts"]->prepare("UPDATE users SET verified_email = 1 WHERE email = ? AND confirm_email_token = ?");
+						$req->execute([$_SESSION["confirm"]["email"], $code]);
+
+						$req = $db["shield"]->prepare("INSERT INTO accounts SET user_id = ?, ip = ?, location = ?, datetime = NOW(), cookie_id = ?");
+						$req->execute([$infos->id, openssl_encrypt($ip, $cipher_algo, $encrypt_password), openssl_encrypt(file_get_contents("http://www.geoplugin.net/php.gp?ip=" . $ip), $cipher_algo, $encrypt_password), $session_cookie->id]);
+						
+						$_SESSION["auth"] = $infos;
+
+						redirect("/account/");
+					} else {
+						$_SESSION["flash"]["error"] = $lang->{"error.confirm_email.invalid_code"};
+					}
+				} else {
+					$_SESSION["flash"]["error"] = $lang->{"error.confirm_email.email_already_verified"};
+				}
+			} else {
+				$_SESSION["flash"]["error"] = $lang->{"error.confirm_email.invalid_email"};
+			}
+		} else {
+			$_SESSION["flash"]["error"] = $lang->{"error.confirm_email.invalid_code_format"};
+		}
+	}
+
+	// Refresh the session
+	$email = $_SESSION["confirm"]["email"];
+	unset($_SESSION["confirm"]["email"]);
+
+	$_SESSION["confirm"]["email"] = $email;
+	
+	//mail()
+} else {
+	error(403);
+}
+
+?><!DOCTYPE html>
+<html lang="<?= $html_lang; ?>" data-theme="light">
+	<head>
+		<title><?= $lang->{"title.confirm_email"}; ?> - <?= strtoupper($lang->{"name"}); ?></title>
+
+		<?php
+			print(page_information($lang->{"title.confirm_email"} . " - " . strtoupper($lang->{"name"}), "Pour activer votre compte, nous vous prions de confirmer votre email.", "créer un compte, confirmer email, compte client"));
+		?>
+		
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/fonts.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/form.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/utils.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/style.css" />
+	</head>
+	<body class="no-select">
+		<?php
+			include_once("assets/html/loading.html");
+		?>
+
+		<?php
+			include_once("assets/html/announcement.html");
+		?>
+
+		<?php
+			include_once("assets/html/header.html");
+		?>
+
+
+		<form class="form" id="form" method="POST" action="">
+			<?php
+				require_once("assets/php/display_errors.php");
+			?>
+			
+			<h1 class="title"><?= $lang->{"form.confirm_email.title"}; ?></h1>
+
+			<span class="input-info"><?= $lang->{"form.confirm_email.content.code"}; ?></span>
+			<input class="input full-input" type="number" name="code" placeholder="<?= $lang->{"form.confirm_email.content.code.code"}; ?> *" style="border-radius: 10px;" required />
+
+			<br />
+
+			<p><?= $lang->{"form.registration.terms"}; ?></p>
+
+			<br />
+
+			<button class="form-button" name="form" type="submit"><?= $lang->{"form.confirm_email.button.submit"}; ?></button>
+
+			<footer class="legal">
+				<span class="legal-credits"><?= $lang->{"footer.form.credits"}; ?></span>
+				<br />
+				<span class="legal"><?= $lang->{"footer.form.legal"}; ?></span>
+			</footer>
+		</form>
+
+		<?php
+			include_once("assets/html/footer.html");
+		?>
+
+		<script type="text/javascript" src="<?= $website_path; ?>/js/utils.js"></script>
+	</body>
+</html>

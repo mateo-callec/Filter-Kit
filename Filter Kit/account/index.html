@@ -1,0 +1,217 @@
+<?php
+
+if (isset($_SESSION["auth"]))
+{
+	$req = $db["accounts"]->prepare("SELECT * FROM users WHERE id = ?");
+	$req->execute([$_SESSION["auth"]->id]);
+
+	$user = $req->fetch();
+} else {
+	redirect("./login/?redirect=" . urlencode("/account/"));
+}
+
+
+if (isset($_GET["page"]))
+{
+	if (intval($_GET["page"]) !== null)
+	{
+		if (intval($_GET["page"]) === 0 || intval($_GET["page"]) === 1 || intval($_GET["page"]) === 2)
+		{
+			$page = intval($_GET["page"]);
+		} else {
+			error(404);
+		}
+	} else {
+		error(404);
+	}
+} else {
+	redirect("./?page=0");
+}
+
+
+
+if
+(
+	isset($_POST["family_name"])
+	&&
+	!empty($_POST["family_name"])
+	&&
+	isset($_POST["first_name"])
+	&&
+	!empty($_POST["first_name"])
+	&&
+	isset($_POST["email"])
+	&&
+	!empty($_POST["email"])
+	&&
+	filter_var($_POST["email"], FILTER_VALIDATE_EMAIL)
+)
+{
+	$req = $db["accounts"]->prepare("UPDATE users SET family_name = ?, first_name = ?, email = ? WHERE id = ?");
+	$req->execute([htmlentities($_POST["family_name"]), htmlentities($_POST["first_name"]), htmlentities($_POST["email"]), $user->id]);
+
+	$req = $db["accounts"]->prepare("SELECT * FROM users WHERE id = ?");
+	$req->execute([$user->id]);
+
+	$infos = $req->fetch();
+
+	$_SESSION["auth"] = $infos;
+
+
+	refresh();
+}
+
+if
+(
+	isset($_POST["current_password"])
+	&&
+	!empty($_POST["current_password"])
+	&&
+	isset($_POST["new_password"])
+	&&
+	!empty($_POST["new_password"])
+	&&
+	$_POST["new_password"] >= 8
+	&&
+	isset($_POST["confirm_new_password"])
+	&&
+	!empty($_POST["confirm_new_password"])
+	&&
+	$_POST["confirm_new_password"] >= 8
+)
+{
+	if (password_verify($_POST["current_password"], $user->password))
+	{
+		if ($_POST["new_password"] === $_POST["confirm_new_password"])
+		{
+			$req = $db["accounts"]->prepare("UPDATE users SET password = ? WHERE id = ?");
+			$req->execute([password_hash($_POST["new_password"], PASSWORD_BCRYPT), $user->id]);
+
+			$req = $db["accounts"]->prepare("SELECT * FROM users WHERE id = ?");
+			$req->execute([$user->id]);
+
+			$infos = $req->fetch();
+
+			$_SESSION["auth"] = $infos;
+
+			refresh();
+		} else {
+			$_SESSION["flash"]["error"] = $lang->{"error.passwords_do_not_match"};
+
+			refresh();
+		}
+	} else {
+		$_SESSION["flash"]["error"] = $lang->{"error.incorrect_password"};
+
+		refresh();
+	}
+}
+
+?><!DOCTYPE html>
+<html lang="<?= $html_lang; ?>" data-theme="light">
+	<head>
+		<title>Espace client - <?= strtoupper($lang->{"name"}); ?></title>
+
+		<?php
+			print(page_information("Articles - " . strtoupper($lang->{"name"}), "Gérez vos informations personnelles, vos commandes et bien plus.", "espace client, information, commande"));
+		?>
+
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/fonts.css" />
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/form.css" />
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/utils.css" />
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/style.css" />
+	</head>
+	<body class="no-select">
+		<?php
+			include_once("assets/html/loading.html");
+		?>
+
+		<?php
+			include_once("assets/html/announcement.html");
+		?>
+
+		<?php
+			include_once("assets/html/header.html");
+		?>
+
+		<?php
+			include_once("assets/html/alert.html");
+		?>
+
+
+		<div class="account">
+			<nav class="account-nav">
+				<a class="account-nav-link<?php
+					if ($page === 0)
+					{
+						print(" account-nav-link-current");
+					}
+				?>" href="./?page=0">Informations générales</a>
+				<a class="account-nav-link<?php
+					if ($page === 1)
+					{
+						print(" account-nav-link-current");
+					}
+				?>" href="./?page=1">Sécurité</a>
+				<a class="account-nav-link<?php
+					if ($page === 2)
+					{
+						print(" account-nav-link-current");
+					}
+				?>" href="./?page=2">Mes commandes</a>
+			</nav>
+			<form class="account-content" method="POST" action="">
+				<?php
+					require_once("assets/php/display_errors.php");
+				?>
+
+				<?php
+					include_once("./assets/html/account/" . $page . ".html");
+				?>
+			</form>
+		</div>
+
+
+		<div class="product-list-small">
+			<ul class="product-list-small">
+				<h2 class="title select"><?= $lang->{"index.last_articles.title"}; ?></h2>
+
+				<?php
+
+					$req = $db["items"]->query("SELECT * FROM items");
+					$item_num = 0;
+
+					while ($item = $req->fetch())
+					{
+						if ($item_num < 5)
+						{
+							?><li class="product-list-small">
+								<img class="product-list-small-icon" src="/img/uploads/items/<?= $item->id; ?>/1.png" draggable="false" />
+								<span class="product-list-small-title select"><?= $item->name; ?></span>
+								<a class="small-button" href="/product/?id=<?= $item->id; ?>" target="_blank"><?= $lang->{"index.last_articles.button"}; ?></a>
+							</li>
+							<hr class="product-list-small" />
+							<?php
+						} else {
+							break;
+						}
+
+						$item_num++;
+					}
+
+					if ($item_num == 0)
+					{
+						?><p><?= $lang->{"index.last_articles.empty"}; ?></p><?php
+					}
+				
+				?>
+			</ul>
+		</div>
+
+		<?php
+			include_once("assets/html/footer.html");
+		?>
+
+		<script type="text/javascript" src="<?= $website_path; ?>/js/utils.js"></script>
+	</body>
+</html>

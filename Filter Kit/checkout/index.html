@@ -1,0 +1,236 @@
+<?php
+
+
+// Check if user is logged in
+
+if (isset($_SESSION["auth"]))
+{
+	// User is connected
+	$user = $_SESSION["auth"];
+} else {
+	redirect("/login/");
+}
+
+if (isset($_POST["remove_item"]))
+{
+	// Delete an item from the cart
+
+	$id = $_POST["remove_item"];
+
+	remove_from_cart($id, $user);
+	refresh(0);
+}
+
+if (isset($_POST["empty_cart"]))
+{
+	// Empty the cart
+
+	empty_cart($user);
+	refresh(0);
+}
+
+
+?><!DOCTYPE html>
+<html lang="<?= $html_lang; ?>" data-theme="light">
+	<head>
+		<title>Panier - <?= strtoupper($lang->{"name"}); ?></title>
+
+		<?php
+			print(page_information("Panier - " . strtoupper($lang->{"name"}), "Visionnez votre panier avant de passer votre commande.", "panier, commande"));
+		?>
+
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/fonts.css" />
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/form.css" />
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/utils.css" />
+		<link rel="stylesheet" href="<?= $website_path; ?>/css/style.css" />
+	</head>
+	<body class="no-select">
+		<?php
+			include_once("assets/html/loading.html");
+		?>
+
+		<?php
+			include_once("assets/html/announcement.html");
+		?>
+
+		<?php
+			include_once("assets/html/header.html");
+		?>
+
+		<?php
+			include_once("assets/html/alert.html");
+		?>
+
+		<div class="pay">
+			<div class="checkout">
+	            <h1><?= $lang->{"form.checkout.title"}; ?></h1>
+	            <a class="medium-button" onclick="window.location.reload();"><?= $lang->{"form.checkout.refresh_cart"}; ?></a>
+	            <br />
+
+	            <form method="POST" action="">
+	            	<input name="empty_cart" type="hidden" value="1" />
+	            	<button class="medium-button" submit><?= $lang->{"form.checkout.empty_cart"}; ?></button>
+	            </form>
+
+	            <ul class="checkout-items">
+	            	<?php
+	            		
+	            		$total_price = 0;
+
+		            	// Get all the items in the cart
+
+						$req = $db["items"]->prepare("SELECT * FROM carts WHERE user_id = ?");
+						$req->execute([$user->id]);
+
+						$cart = $req->fetch();
+
+						$out_of_stock = false;
+
+						if ($cart)
+						{
+							$items = json_decode($cart->content, true);
+
+							if ($items)
+							{
+								for ($i = 0; $i < count($items); $i++)
+								{
+									$req = $db["items"]->prepare("SELECT * FROM items WHERE id = ?");
+									$req->execute([$items[$i]]);
+
+									$item = $req->fetch();
+
+									if ($item)
+									{
+										?><li class="checkout-item">
+						                    <img class="checkout-item-icon" src="/img/uploads/items/<?= $item->id; ?>/1.png" alt="Image" />
+						                    <div class="checkout-item-content">
+							                    <div class="checkout-item-content-text">
+							                    	<h2 class="checkout-item-content-text-title"><?= $item->name; ?><?php
+								                    	if ($item->items_available <= 0)
+														{
+															$out_of_stock = true;
+															?><div class="warning-tag"><?= $lang->{"page.product.out_of_stock"}; ?></div><?php
+														}
+													?></h2>
+							                    	<span class="checkout-item-content-text-category"><?= category($item->category); ?></span>
+							                    </div>
+							                    <div class="checkout-item-content-price">
+													<?php
+														if ($item->discount_price === null)
+														{
+															$total_price += $item->original_price;
+
+															?><span class="checkout-item-content-price-actual"><?= price($item->original_price) . CURRENCY_SYMBOL; ?></span><?php
+														} else {
+															$total_price += $item->discount_price;
+															
+															?><span class="checkout-item-content-price-actual"><?= price($item->discount_price) . CURRENCY_SYMBOL; ?></span>
+															<span class="checkout-item-content-price-old"><?= price($item->original_price) . CURRENCY_SYMBOL; ?></span><?php
+														}
+													?>
+												</div>
+												<form class="checkout-item-content-remove" method="POST" action="">
+													<input name="remove_item" type="hidden" value="<?= $i; ?>" />
+													<button class="checkout-item-content-remove medium-button" submit><?= $lang->{"form.checkout.remove_item"}; ?></button>
+												</form>
+											</div>
+						                </li><?php
+									} else {
+										?><li class="checkout-item">
+						                    <img class="checkout-item-icon" src="" alt="Image" />
+						                    <div class="checkout-item-content">
+							                    <div class="checkout-item-content-text">
+							                    	<h2 class="checkout-item-content-text-title">[ARTICLE INTROUVABLE]</h2>
+							                    </div>
+							                    <div class="checkout-item-content-price">
+													<span class="checkout-item-content-price-actual">-</span>
+												</div>
+												<div class="checkout-item-content-remove">
+													<a class="checkout-item-content-remove medium-button" href="">Enlever</a>
+												</div>
+											</div>
+						                </li><?php
+									}
+								}
+							}
+						}
+
+						if (!$cart || !$items || count($items) == 0)
+						{
+							?><h3><?= $lang->{"form.checkout.the_cart_is_empty"}; ?></h3><?php
+						}
+					?>
+	                
+	            </ul>
+	        </div>
+
+	        <div class="billing-information form">
+	        	<h1><?= $lang->{"name"}; ?></h1>
+			    <hr />
+	        	<?php
+	        		if ($total_price > 0)
+	        		{
+	        			?>
+			        	<table class="billing-information-table">
+				        	<?php
+				        		$items = json_decode($cart->content, true);
+
+								if ($items)
+								{
+									for ($i = 0; $i < count($items); $i++)
+									{
+										$req = $db["items"]->prepare("SELECT * FROM items WHERE id = ?");
+										$req->execute([$items[$i]]);
+
+										$item = $req->fetch();
+
+										if ($item)
+										{
+											?><tr>
+												<td class="billing-information-table-left"><?= $item->name; ?></td>
+												<td class="billing-information-table-right"><?php
+													if ($item->discount_price === null)
+													{
+														print(price($item->original_price) . CURRENCY_SYMBOL);
+													} else {
+														print(price($item->discount_price) . CURRENCY_SYMBOL);
+													}
+												?>
+											</tr><?php
+										}
+									}
+								}
+							?>
+							<tr style="height: 60px;"></tr>
+							<tr style="background-color: #ffffff;">
+								<td class="billing-information-table-left"><b><?= $lang->{"form.checkout.total_price"}; ?></b></td>
+								<td class="billing-information-table-right"><?= price($total_price) . CURRENCY_SYMBOL; ?></td>
+							</tr>
+						</table>
+						<br />
+						<?php
+							if ($out_of_stock == false)
+							{
+								?><p>En poursuivant, vous acceptez notre <a href="/legal/returns/" target="_blank">politique de retours</a>.</p>
+								<br />
+								<button class="medium-button" onclick="window.location = '../payment/';"><?= $lang->{"form.checkout.proceed_to_payment"}; ?></button><?php
+							} else {
+								?><span class="error"><?= $lang->{"error.out_of_stock"}; ?></span><?php
+							}
+						?>
+
+						<?php
+	        		} else {
+	        			?><b><?= $lang->{"form.checkout.the_cart_is_empty"}; ?></b><?php
+	        		}
+	        	?>
+	        </div>
+	    </div>
+
+		<?php
+			include_once("assets/html/footer.html");
+		?>
+
+		<script type="text/javascript" src="<?= $website_path; ?>/js/utils.js"></script>
+	</body>
+</html>

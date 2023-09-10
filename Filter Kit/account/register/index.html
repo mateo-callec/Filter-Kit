@@ -1,0 +1,174 @@
+<?php
+
+if (isset($_SESSION["auth"]))
+{
+	redirect("../");
+} else if (isset($_SESSION["confirm"]["email"])) {
+	redirect("confirm/?type=email");
+}
+
+if (isset($_POST["form"]) && $_POST["form"] == 1)
+{
+	if (
+		isset($_POST["family_name"])
+		&&
+		!empty($_POST["family_name"])
+		&&
+		isset($_POST["first_name"])
+		&&
+		!empty($_POST["first_name"])
+		&&
+		isset($_POST["email"])
+		&&
+		!empty($_POST["email"])
+		&&
+		!empty($_POST["email"])
+		&&
+		isset($_POST["password"])
+		&&
+		!empty($_POST["password"])
+		&&
+		strlen($_POST["password"]) >= 8
+		&&
+		isset($_POST["confirm_password"])
+		&&
+		!empty($_POST["confirm_password"])
+		&&
+		strlen($_POST["confirm_password"]) >= 8
+	)
+	{
+		// Check if email is valid
+		if (filter_var($_POST["email"], FILTER_VALIDATE_EMAIL))
+		{
+			// Check if email exists
+
+			$req = $db["accounts"]->prepare("SELECT id FROM users WHERE email = ?");
+			$req->execute([htmlentities($_POST["email"])]);
+
+			if (!$req->fetch())
+			{
+				// Check if password and confirmation are the same
+
+				if ($_POST["password"] == $_POST["confirm_password"])
+				{
+					/* Creates the user */
+
+					
+					// Generates the email confirmation code
+
+					do {
+						$confirm_email_token = str_random(8, "0123456789");
+
+						$req = $db["accounts"]->prepare("SELECT id FROM users WHERE confirm_email_token = ?");
+						$req->execute([$confirm_email_token]);
+
+						if (!$req->fetch())
+						{
+							break;
+						}
+					} while (true);
+
+
+					$req = $db["accounts"]->prepare("INSERT INTO users SET email = ?, family_name = ?, first_name = ?, password = ?, creation_date = NOW(), verified_email = 0, confirm_email_token = ?");
+					$req->execute([
+						htmlentities($_POST["email"]),
+						htmlentities($_POST["family_name"]),
+						htmlentities($_POST["first_name"]),
+						password_hash($_POST["password"], PASSWORD_BCRYPT),
+						$confirm_email_token
+					]);
+
+					$_SESSION["confirm"]["email"] = htmlentities($_POST["email"]);
+					
+					redirect("confirm/?type=email");
+				} else {
+					$_SESSION["flash"]["error"] = $lang->{"error.passwords_do_not_match"};
+				}
+			} else {
+				$_SESSION["flash"]["error"] = $lang->{"error.email_already_exists"};
+			}
+		} else {
+			$_SESSION["flash"]["error"] = $lang->{"error.invalid_email"};
+		}
+		
+	} else {
+		// An error has occured
+
+		$_SESSION["flash"]["error"] = $lang->{"error.default"};
+	}
+}
+
+?><!DOCTYPE html>
+<html lang="<?= $html_lang; ?>" data-theme="light">
+	<head>
+		<title><?= $lang->{"title.registration"}; ?> - <?= strtoupper($lang->{"name"}); ?></title>
+
+		<?php
+			print(page_information($lang->{"title.registration"} . " - " . strtoupper($lang->{"name"}), "Créez rapidement un compte client pour accéder aux autres fonctionnalités du site.", "créer un compte, compte client"));
+		?>
+
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/fonts.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/form.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/utils.css" />
+		<link rel="stylesheet" href="<?= $inter_website_path; ?>/css/style.css" />
+	</head>
+	<body class="no-select">
+		<?php
+			include_once("assets/html/loading.html");
+		?>
+
+		<?php
+			include_once("assets/html/announcement.html");
+		?>
+
+		<?php
+			include_once("assets/html/header.html");
+		?>
+
+
+		<form class="form" id="form" method="POST" action="">
+			<input type="hidden" name="form" value="1" />
+
+			<?php
+				require_once("assets/php/display_errors.php");
+			?>
+			
+			<h1 class="title"><?= $lang->{"form.registration.title"}; ?></h1>
+
+			<span class="input-info"><?= $lang->{"form.registration.content.general_information"}; ?></span>
+			<input class="input half-input" type="text" name="family_name" placeholder="<?= $lang->{"form.registration.content.general_information.family_name"}; ?> *" style="border-top-left-radius: 10px; border-bottom-left-radius: 10px;" required />
+			<input class="input half-input" type="text" name="first_name" placeholder="<?= $lang->{"form.registration.content.general_information.first_name"}; ?> *" style="border-top-right-radius: 10px; border-bottom-right-radius: 10px;" required />
+
+			<br />
+			<br />
+			<span class="input-info"><?= $lang->{"form.registration.content.email"}; ?></span>
+			<input class="input full-input" type="email" name="email" placeholder="<?= $lang->{"form.registration.content.email.email"}; ?> *" style="border-radius: 10px;" required />
+
+
+			<span class="input-info"><?= $lang->{"form.registration.content.password"}; ?></span>
+			<input class="input full-input" type="password" name="password" placeholder="<?= $lang->{"form.registration.content.password.password"}; ?> *" style="border-top-left-radius: 10px; border-top-right-radius: 10px;" minlength="8" required />
+			<input class="input full-input" type="password" name="confirm_password" placeholder="<?= $lang->{"form.registration.content.password.confirm_password"}; ?> *" style="border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;" minlength="8" required />
+
+			<br />
+
+			<p><?= $lang->{"form.registration.terms"}; ?></p>
+
+			<br />
+
+			<button class="form-button" type="submit"><?= $lang->{"form.registration.button.submit"}; ?></button>
+			<button class="form-button" onclick="window.location = '<?= $inter_website_path; ?>/login/';"><?= $lang->{"form.registration.button.login"}; ?></button>
+
+			<footer class="legal">
+				<span class="legal-credits"><?= $lang->{"footer.form.credits"}; ?></span>
+				<br />
+				<span class="legal"><?= $lang->{"footer.form.legal"}; ?></span>
+			</footer>
+		</form>
+
+		<?php
+			include_once("assets/html/footer.html");
+		?>
+
+		<script type="text/javascript" src="<?= $website_path; ?>/js/utils.js"></script>
+	</body>
+</html>
